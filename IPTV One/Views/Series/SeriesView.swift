@@ -9,7 +9,7 @@ import SwiftUI
 import SwiftData
 
 struct SeriesView: View {
-    @Bindable var playlistManager: PlaylistManager
+    @Bindable var sourceManager: SourceManager
     
     @Environment(\.modelContext) private var modelContext
     @Query(sort: \Series.name) private var allSeries: [Series]
@@ -42,8 +42,8 @@ struct SeriesView: View {
         ZStack {
             Color.darkBackground.ignoresSafeArea()
             
-            if playlistManager.isLoading {
-                LoadingView(message: playlistManager.loadingMessage)
+            if sourceManager.isLoading {
+                LoadingView(message: sourceManager.loadingMessage)
             } else if allSeries.isEmpty {
                 emptyState
             } else {
@@ -63,7 +63,7 @@ struct SeriesView: View {
         EmptyStateView(
             icon: "tv",
             title: "No Series",
-            message: "Add a playlist in Settings to browse TV series.",
+            message: "Add a source in Settings to browse TV series.",
             actionTitle: nil,
             action: nil
         )
@@ -119,7 +119,7 @@ struct SeriesView: View {
 
 #Preview {
     NavigationStack {
-        SeriesView(playlistManager: PlaylistManager())
+        SeriesView(sourceManager: SourceManager())
     }
-    .modelContainer(for: [Playlist.self, Series.self], inMemory: true)
+    .modelContainer(for: [Source.self, Series.self], inMemory: true)
 }

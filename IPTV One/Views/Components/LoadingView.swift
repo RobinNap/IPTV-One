@@ -100,7 +100,7 @@ struct EmptyStateView: View {
     EmptyStateView(
         icon: "antenna.radiowaves.left.and.right",
         title: "No Channels",
-        message: "Add a playlist to start watching live TV",
-        actionTitle: "Add Playlist"
+        message: "Add a source to start watching live TV",
+        actionTitle: "Add Source"
     ) {}
 }

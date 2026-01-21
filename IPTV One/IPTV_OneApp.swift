@@ -12,7 +12,7 @@ import SwiftData
 struct IPTV_OneApp: App {
     var sharedModelContainer: ModelContainer = {
         let schema = Schema([
-            Playlist.self,
+            Source.self,
             Channel.self,
             Movie.self,
             Series.self,
@@ -21,12 +21,29 @@ struct IPTV_OneApp: App {
             Category.self,
             EPGProgram.self,
         ])
-        let modelConfiguration = ModelConfiguration(schema: schema, isStoredInMemoryOnly: false)
         
+        // Try CloudKit sync first, fall back to local storage if it fails
         do {
-            return try ModelContainer(for: schema, configurations: [modelConfiguration])
+            let cloudConfig = ModelConfiguration(
+                schema: schema,
+                isStoredInMemoryOnly: false,
+                cloudKitDatabase: .private("iCloud.com.robinnap.IPTV-One")
+            )
+            return try ModelContainer(for: schema, configurations: [cloudConfig])
         } catch {
-            fatalError("Could not create ModelContainer: \(error)")
+            print("CloudKit sync failed, falling back to local storage: \(error)")
+            
+            // Fall back to local storage without CloudKit
+            do {
+                let localConfig = ModelConfiguration(
+                    schema: schema,
+                    isStoredInMemoryOnly: false,
+                    cloudKitDatabase: .none
+                )
+                return try ModelContainer(for: schema, configurations: [localConfig])
+            } catch {
+                fatalError("Could not create ModelContainer: \(error)")
+            }
         }
     }()
     

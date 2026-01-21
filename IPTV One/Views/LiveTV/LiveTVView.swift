@@ -9,10 +9,10 @@ import SwiftUI
 import SwiftData
 
 struct LiveTVView: View {
-    @Bindable var playlistManager: PlaylistManager
+    @Bindable var sourceManager: SourceManager
     
     @Environment(\.modelContext) private var modelContext
-    @Query private var playlists: [Playlist]
+    @Query private var sources: [Source]
     @Query(sort: \Channel.name) private var allChannels: [Channel]
     
     @State private var searchText = ""
@@ -44,8 +44,8 @@ struct LiveTVView: View {
         ZStack {
             Color.darkBackground.ignoresSafeArea()
             
-            if playlistManager.isLoading {
-                LoadingView(message: playlistManager.loadingMessage)
+            if sourceManager.isLoading {
+                LoadingView(message: sourceManager.loadingMessage)
             } else if allChannels.isEmpty {
                 emptyState
             } else {
@@ -72,7 +72,7 @@ struct LiveTVView: View {
         EmptyStateView(
             icon: "antenna.radiowaves.left.and.right",
             title: "No Channels",
-            message: "Add a playlist in Settings to start watching live TV channels.",
+            message: "Add a source in Settings to start watching live TV channels.",
             actionTitle: nil,
             action: nil
         )
@@ -137,8 +137,8 @@ struct LiveTVView: View {
     }
     
     private func loadEPGData() async {
-        guard let playlist = playlists.first(where: { $0.isActive }),
-              let epgURL = playlist.epgURL else { return }
+        guard let source = sources.first(where: { $0.isActive }),
+              let epgURL = source.epgURL else { return }
         
         do {
             epgData = try await EPGService.shared.fetchEPG(from: epgURL)
@@ -150,7 +150,7 @@ struct LiveTVView: View {
 
 #Preview {
     NavigationStack {
-        LiveTVView(playlistManager: PlaylistManager())
+        LiveTVView(sourceManager: SourceManager())
     }
-    .modelContainer(for: [Playlist.self, Channel.self], inMemory: true)
+    .modelContainer(for: [Source.self, Channel.self], inMemory: true)
 }

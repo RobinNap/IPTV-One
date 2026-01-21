@@ -26,7 +26,7 @@ enum AppTab: String, CaseIterable {
 
 struct MainTabView: View {
     @State private var selectedTab: AppTab = .liveTV
-    @State private var playlistManager = PlaylistManager()
+    @State private var sourceManager = SourceManager()
     @Environment(\.modelContext) private var modelContext
     
     var body: some View {
@@ -42,25 +42,25 @@ struct MainTabView: View {
     #if os(iOS)
     private var iOSLayout: some View {
         TabView(selection: $selectedTab) {
-            LiveTVView(playlistManager: playlistManager)
+            LiveTVView(sourceManager: sourceManager)
                 .tabItem {
                     Label(AppTab.liveTV.rawValue, systemImage: AppTab.liveTV.icon)
                 }
                 .tag(AppTab.liveTV)
             
-            MoviesView(playlistManager: playlistManager)
+            MoviesView(sourceManager: sourceManager)
                 .tabItem {
                     Label(AppTab.movies.rawValue, systemImage: AppTab.movies.icon)
                 }
                 .tag(AppTab.movies)
             
-            SeriesView(playlistManager: playlistManager)
+            SeriesView(sourceManager: sourceManager)
                 .tabItem {
                     Label(AppTab.series.rawValue, systemImage: AppTab.series.icon)
                 }
                 .tag(AppTab.series)
             
-            SettingsView(playlistManager: playlistManager)
+            SettingsView(sourceManager: sourceManager)
                 .tabItem {
                     Label(AppTab.settings.rawValue, systemImage: AppTab.settings.icon)
                 }
@@ -69,7 +69,7 @@ struct MainTabView: View {
         .tint(.primaryAccent)
         .onAppear {
             configureTabBarAppearance()
-            playlistManager.setModelContext(modelContext)
+            sourceManager.setModelContext(modelContext)
         }
     }
     
@@ -100,18 +100,18 @@ struct MainTabView: View {
                 
                 switch selectedTab {
                 case .liveTV:
-                    LiveTVView(playlistManager: playlistManager)
+                    LiveTVView(sourceManager: sourceManager)
                 case .movies:
-                    MoviesView(playlistManager: playlistManager)
+                    MoviesView(sourceManager: sourceManager)
                 case .series:
-                    SeriesView(playlistManager: playlistManager)
+                    SeriesView(sourceManager: sourceManager)
                 case .settings:
-                    SettingsView(playlistManager: playlistManager)
+                    SettingsView(sourceManager: sourceManager)
                 }
             }
         }
         .onAppear {
-            playlistManager.setModelContext(modelContext)
+            sourceManager.setModelContext(modelContext)
         }
     }
     #endif
@@ -119,5 +119,5 @@ struct MainTabView: View {
 
 #Preview {
     MainTabView()
-        .modelContainer(for: [Playlist.self, Channel.self, Movie.self, Series.self], inMemory: true)
+        .modelContainer(for: [Source.self, Channel.self, Movie.self, Series.self], inMemory: true)
 }

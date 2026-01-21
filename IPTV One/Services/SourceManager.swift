@@ -1,5 +1,5 @@
 //
-//  PlaylistManager.swift
+//  SourceManager.swift
 //  IPTV One
 //
 //  Created by Robin Nap on 21/01/2026.
@@ -10,7 +10,7 @@ import SwiftData
 import SwiftUI
 
 @Observable
-class PlaylistManager {
+class SourceManager {
     var isLoading = false
     var loadingMessage = ""
     var error: Error?
@@ -22,37 +22,37 @@ class PlaylistManager {
     }
     
     @MainActor
-    func loadPlaylist(_ playlist: Playlist) async {
+    func loadSource(_ source: Source) async {
         guard let modelContext else { return }
         
         isLoading = true
-        loadingMessage = "Fetching playlist..."
+        loadingMessage = "Fetching source..."
         error = nil
         
         do {
-            guard let url = URL(string: playlist.url) else {
+            guard let url = URL(string: source.url) else {
                 throw NetworkError.invalidURL
             }
             
-            let playlistInfo = try await M3UParser.shared.parsePlaylist(from: url)
+            let sourceInfo = try await M3UParser.shared.parsePlaylist(from: url)
             
             loadingMessage = "Processing channels..."
             
             // Clear existing content
-            for channel in playlist.channels {
+            for channel in source.channels {
                 modelContext.delete(channel)
             }
-            for movie in playlist.movies {
+            for movie in source.movies {
                 modelContext.delete(movie)
             }
-            for series in playlist.series {
+            for series in source.series {
                 modelContext.delete(series)
             }
             
             // Group series episodes
             var seriesMap: [String: [(M3UItem, Int, Int)]] = [:]
             
-            for item in playlistInfo.items {
+            for item in sourceInfo.items {
                 switch item.contentType {
                 case .live:
                     let channel = Channel(
@@ -63,7 +63,7 @@ class PlaylistManager {
                         epgID: item.tvgID,
                         tvgName: item.tvgName
                     )
-                    channel.playlist = playlist
+                    channel.source = source
                     modelContext.insert(channel)
                     
                 case .movie:
@@ -73,7 +73,7 @@ class PlaylistManager {
                         posterURL: item.logoURL,
                         categoryName: item.groupTitle
                     )
-                    movie.playlist = playlist
+                    movie.source = source
                     modelContext.insert(movie)
                     
                 case .series:
@@ -89,7 +89,7 @@ class PlaylistManager {
                             posterURL: item.logoURL,
                             categoryName: item.groupTitle
                         )
-                        movie.playlist = playlist
+                        movie.source = source
                         modelContext.insert(movie)
                     }
                 }
@@ -108,7 +108,7 @@ class PlaylistManager {
                     posterURL: episodes.first?.0.logoURL,
                     categoryName: categoryName
                 )
-                series.playlist = playlist
+                series.source = source
                 
                 // Group by season
                 let seasonGroups = Dictionary(grouping: episodes) { $0.1 }
@@ -135,18 +135,18 @@ class PlaylistManager {
             }
             
             // Update EPG URL if found
-            if let epgURL = playlistInfo.epgURL {
-                playlist.epgURL = epgURL
+            if let epgURL = sourceInfo.epgURL {
+                source.epgURL = epgURL
             }
             
-            playlist.lastUpdated = Date()
+            source.lastUpdated = Date()
             
             try modelContext.save()
             
             loadingMessage = "Loading EPG data..."
             
             // Load EPG if available
-            if let epgURL = playlist.epgURL {
+            if let epgURL = source.epgURL {
                 do {
                     _ = try await EPGService.shared.fetchEPG(from: epgURL)
                 } catch {

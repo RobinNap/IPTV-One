@@ -24,8 +24,8 @@ final class Series {
     @Relationship(deleteRule: .cascade)
     var seasons: [Season]
     
-    @Relationship(inverse: \Playlist.series)
-    var playlist: Playlist?
+    @Relationship(inverse: \Source.series)
+    var source: Source?
     
     init(
         id: UUID = UUID(),

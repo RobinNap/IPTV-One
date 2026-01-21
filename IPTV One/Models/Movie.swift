@@ -25,8 +25,8 @@ final class Movie {
     var lastWatched: Date?
     var watchProgress: Double
     
-    @Relationship(inverse: \Playlist.movies)
-    var playlist: Playlist?
+    @Relationship(inverse: \Source.movies)
+    var source: Source?
     
     init(
         id: UUID = UUID(),

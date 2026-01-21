@@ -9,7 +9,7 @@ import SwiftUI
 import SwiftData
 
 struct MoviesView: View {
-    @Bindable var playlistManager: PlaylistManager
+    @Bindable var sourceManager: SourceManager
     
     @Environment(\.modelContext) private var modelContext
     @Query(sort: \Movie.name) private var allMovies: [Movie]
@@ -48,8 +48,8 @@ struct MoviesView: View {
         ZStack {
             Color.darkBackground.ignoresSafeArea()
             
-            if playlistManager.isLoading {
-                LoadingView(message: playlistManager.loadingMessage)
+            if sourceManager.isLoading {
+                LoadingView(message: sourceManager.loadingMessage)
             } else if allMovies.isEmpty {
                 emptyState
             } else {
@@ -82,7 +82,7 @@ struct MoviesView: View {
         EmptyStateView(
             icon: "film",
             title: "No Movies",
-            message: "Add a playlist in Settings to browse movies.",
+            message: "Add a source in Settings to browse movies.",
             actionTitle: nil,
             action: nil
         )
@@ -290,7 +290,7 @@ struct MovieDetailView: View {
 
 #Preview {
     NavigationStack {
-        MoviesView(playlistManager: PlaylistManager())
+        MoviesView(sourceManager: SourceManager())
     }
-    .modelContainer(for: [Playlist.self, Movie.self], inMemory: true)
+    .modelContainer(for: [Source.self, Movie.self], inMemory: true)
 }

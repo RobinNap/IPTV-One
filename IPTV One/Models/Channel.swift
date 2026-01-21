@@ -20,8 +20,8 @@ final class Channel {
     var isFavorite: Bool
     var lastWatched: Date?
     
-    @Relationship(inverse: \Playlist.channels)
-    var playlist: Playlist?
+    @Relationship(inverse: \Source.channels)
+    var source: Source?
     
     init(
         id: UUID = UUID(),

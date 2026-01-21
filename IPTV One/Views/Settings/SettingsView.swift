@@ -9,12 +9,12 @@ import SwiftUI
 import SwiftData
 
 struct SettingsView: View {
-    @Bindable var playlistManager: PlaylistManager
+    @Bindable var sourceManager: SourceManager
     
     @Environment(\.modelContext) private var modelContext
-    @Query private var playlists: [Playlist]
+    @Query private var sources: [Source]
     
-    @State private var showingAddPlaylist = false
+    @State private var showingAddSource = false
     
     var body: some View {
         ZStack {
@@ -22,8 +22,8 @@ struct SettingsView: View {
             
             ScrollView {
                 LazyVStack(alignment: .leading, spacing: 24) {
-                    // Playlists Section
-                    playlistsSection
+                    // Sources Section
+                    sourcesSection
                     
                     // App Info Section
                     appInfoSection
@@ -35,27 +35,27 @@ struct SettingsView: View {
         #if os(iOS)
         .navigationBarTitleDisplayMode(.large)
         #endif
-        .sheet(isPresented: $showingAddPlaylist) {
-            AddPlaylistView { playlist in
-                modelContext.insert(playlist)
+        .sheet(isPresented: $showingAddSource) {
+            AddSourceView { source in
+                modelContext.insert(source)
                 Task {
-                    await playlistManager.loadPlaylist(playlist)
+                    await sourceManager.loadSource(source)
                 }
             }
         }
     }
     
-    private var playlistsSection: some View {
+    private var sourcesSection: some View {
         VStack(alignment: .leading, spacing: 16) {
             HStack {
-                Text("Playlists")
+                Text("Sources")
                     .font(.system(size: 20, weight: .bold))
                     .foregroundStyle(.white)
                 
                 Spacer()
                 
                 Button {
-                    showingAddPlaylist = true
+                    showingAddSource = true
                 } label: {
                     Label("Add", systemImage: "plus")
                         .font(.system(size: 14, weight: .semibold))
@@ -68,17 +68,17 @@ struct SettingsView: View {
                 .buttonStyle(.plain)
             }
             
-            if playlists.isEmpty {
+            if sources.isEmpty {
                 VStack(spacing: 12) {
                     Image(systemName: "list.bullet.rectangle")
                         .font(.system(size: 32))
                         .foregroundStyle(.secondary)
                     
-                    Text("No Playlists")
+                    Text("No Sources")
                         .font(.system(size: 16, weight: .semibold))
                         .foregroundStyle(.white)
                     
-                    Text("Add an M3U playlist to get started")
+                    Text("Add an M3U source to get started")
                         .font(.system(size: 14))
                         .foregroundStyle(.secondary)
                 }
@@ -88,16 +88,16 @@ struct SettingsView: View {
                 .clipShape(RoundedRectangle(cornerRadius: 12))
             } else {
                 VStack(spacing: 1) {
-                    ForEach(playlists) { playlist in
-                        PlaylistRow(
-                            playlist: playlist,
-                            isLoading: playlistManager.isLoading
+                    ForEach(sources) { source in
+                        SourceRow(
+                            source: source,
+                            isLoading: sourceManager.isLoading
                         ) {
                             Task {
-                                await playlistManager.loadPlaylist(playlist)
+                                await sourceManager.loadSource(source)
                             }
                         } onDelete: {
-                            modelContext.delete(playlist)
+                            modelContext.delete(source)
                         }
                     }
                 }
@@ -139,8 +139,8 @@ struct SettingsView: View {
     }
 }
 
-struct PlaylistRow: View {
-    let playlist: Playlist
+struct SourceRow: View {
+    let source: Source
     let isLoading: Bool
     let onRefresh: () -> Void
     let onDelete: () -> Void
@@ -159,12 +159,12 @@ struct PlaylistRow: View {
             
             // Info
             VStack(alignment: .leading, spacing: 4) {
-                Text(playlist.name)
+                Text(source.name)
                     .font(.system(size: 15, weight: .semibold))
                     .foregroundStyle(.white)
                 
                 HStack(spacing: 8) {
-                    if let lastUpdated = playlist.lastUpdated {
+                    if let lastUpdated = source.lastUpdated {
                         Text("Updated \(lastUpdated.relativeTimeString())")
                             .font(.system(size: 12))
                             .foregroundStyle(.secondary)
@@ -211,19 +211,19 @@ struct PlaylistRow: View {
         }
         .padding(16)
         .background(Color.darkCardBackground)
-        .confirmationDialog("Delete Playlist", isPresented: $showingDeleteConfirmation) {
+        .confirmationDialog("Delete Source", isPresented: $showingDeleteConfirmation) {
             Button("Delete", role: .destructive, action: onDelete)
             Button("Cancel", role: .cancel) {}
         } message: {
-            Text("Are you sure you want to delete \"\(playlist.name)\"? This will remove all channels, movies, and series from this playlist.")
+            Text("Are you sure you want to delete \"\(source.name)\"? This will remove all channels, movies, and series from this source.")
         }
     }
 }
 
-// MARK: - Add Playlist View
+// MARK: - Add Source View
 
-struct AddPlaylistView: View {
-    var onAdd: (Playlist) -> Void
+struct AddSourceView: View {
+    var onAdd: (Source) -> Void
     
     @Environment(\.dismiss) private var dismiss
     
@@ -246,11 +246,11 @@ struct AddPlaylistView: View {
                     VStack(alignment: .leading, spacing: 24) {
                         // Name
                         VStack(alignment: .leading, spacing: 8) {
-                            Text("Playlist Name")
+                            Text("Source Name")
                                 .font(.system(size: 14, weight: .medium))
                                 .foregroundStyle(.secondary)
                             
-                            TextField("My Playlist", text: $name)
+                            TextField("My Source", text: $name)
                                 .textFieldStyle(IPTVTextFieldStyle())
                         }
                         
@@ -315,7 +315,7 @@ struct AddPlaylistView: View {
                     .padding(16)
                 }
             }
-            .navigationTitle("Add Playlist")
+            .navigationTitle("Add Source")
             #if os(iOS)
             .navigationBarTitleDisplayMode(.inline)
             #endif
@@ -328,13 +328,13 @@ struct AddPlaylistView: View {
                 
                 ToolbarItem(placement: .confirmationAction) {
                     Button("Add") {
-                        let playlist = Playlist(
+                        let source = Source(
                             name: name,
                             url: url,
                             username: useCredentials ? username : nil,
                             password: useCredentials ? password : nil
                         )
-                        onAdd(playlist)
+                        onAdd(source)
                         dismiss()
                     }
                     .disabled(!isValid)
@@ -358,7 +358,7 @@ struct IPTVTextFieldStyle: TextFieldStyle {
 
 #Preview {
     NavigationStack {
-        SettingsView(playlistManager: PlaylistManager())
+        SettingsView(sourceManager: SourceManager())
     }
-    .modelContainer(for: [Playlist.self], inMemory: true)
+    .modelContainer(for: [Source.self], inMemory: true)
 }

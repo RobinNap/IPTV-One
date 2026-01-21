@@ -1,5 +1,5 @@
 //
-//  Playlist.swift
+//  Source.swift
 //  IPTV One
 //
 //  Created by Robin Nap on 21/01/2026.
@@ -9,7 +9,7 @@ import Foundation
 import SwiftData
 
 @Model
-final class Playlist {
+final class Source {
     var id: UUID
     var name: String
     var url: String
