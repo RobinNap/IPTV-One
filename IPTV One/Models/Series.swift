@@ -10,19 +10,19 @@ import SwiftData
 
 @Model
 final class Series {
-    var id: UUID
-    var name: String
+    var id: UUID = UUID()
+    var name: String = ""
     var posterURL: String?
-    var categoryName: String
+    var categoryName: String = "Uncategorized"
     var plot: String?
     var year: String?
     var rating: String?
     var cast: String?
     var director: String?
-    var isFavorite: Bool
+    var isFavorite: Bool = false
     
     @Relationship(deleteRule: .cascade)
-    var seasons: [Season]
+    var seasons: [Season]?
     
     @Relationship(inverse: \Source.series)
     var source: Source?
@@ -51,16 +51,22 @@ final class Series {
         self.isFavorite = isFavorite
         self.seasons = []
     }
+    
+    // Helper computed property to safely access optional array
+    var seasonsList: [Season] {
+        get { seasons ?? [] }
+        set { seasons = newValue }
+    }
 }
 
 @Model
 final class Season {
-    var id: UUID
-    var seasonNumber: Int
+    var id: UUID = UUID()
+    var seasonNumber: Int = 1
     var name: String?
     
     @Relationship(deleteRule: .cascade)
-    var episodes: [Episode]
+    var episodes: [Episode]?
     
     @Relationship(inverse: \Series.seasons)
     var series: Series?
@@ -75,18 +81,24 @@ final class Season {
         self.name = name
         self.episodes = []
     }
+    
+    // Helper computed property to safely access optional array
+    var episodesList: [Episode] {
+        get { episodes ?? [] }
+        set { episodes = newValue }
+    }
 }
 
 @Model
 final class Episode {
-    var id: UUID
-    var episodeNumber: Int
-    var name: String
-    var streamURL: String
+    var id: UUID = UUID()
+    var episodeNumber: Int = 1
+    var name: String = ""
+    var streamURL: String = ""
     var plot: String?
     var duration: String?
     var stillURL: String?
-    var watchProgress: Double
+    var watchProgress: Double = 0
     var lastWatched: Date?
     
     @Relationship(inverse: \Season.episodes)

@@ -42,29 +42,37 @@ struct MainTabView: View {
     #if os(iOS)
     private var iOSLayout: some View {
         TabView(selection: $selectedTab) {
-            LiveTVView(sourceManager: sourceManager)
-                .tabItem {
-                    Label(AppTab.liveTV.rawValue, systemImage: AppTab.liveTV.icon)
-                }
-                .tag(AppTab.liveTV)
+            NavigationStack {
+                LiveTVView(sourceManager: sourceManager)
+            }
+            .tabItem {
+                Label(AppTab.liveTV.rawValue, systemImage: AppTab.liveTV.icon)
+            }
+            .tag(AppTab.liveTV)
             
-            MoviesView(sourceManager: sourceManager)
-                .tabItem {
-                    Label(AppTab.movies.rawValue, systemImage: AppTab.movies.icon)
-                }
-                .tag(AppTab.movies)
+            NavigationStack {
+                MoviesView(sourceManager: sourceManager)
+            }
+            .tabItem {
+                Label(AppTab.movies.rawValue, systemImage: AppTab.movies.icon)
+            }
+            .tag(AppTab.movies)
             
-            SeriesView(sourceManager: sourceManager)
-                .tabItem {
-                    Label(AppTab.series.rawValue, systemImage: AppTab.series.icon)
-                }
-                .tag(AppTab.series)
+            NavigationStack {
+                SeriesView(sourceManager: sourceManager)
+            }
+            .tabItem {
+                Label(AppTab.series.rawValue, systemImage: AppTab.series.icon)
+            }
+            .tag(AppTab.series)
             
-            SettingsView(sourceManager: sourceManager)
-                .tabItem {
-                    Label(AppTab.settings.rawValue, systemImage: AppTab.settings.icon)
-                }
-                .tag(AppTab.settings)
+            NavigationStack {
+                SettingsView(sourceManager: sourceManager)
+            }
+            .tabItem {
+                Label(AppTab.settings.rawValue, systemImage: AppTab.settings.icon)
+            }
+            .tag(AppTab.settings)
         }
         .tint(.primaryAccent)
         .onAppear {
@@ -100,13 +108,21 @@ struct MainTabView: View {
                 
                 switch selectedTab {
                 case .liveTV:
-                    LiveTVView(sourceManager: sourceManager)
+                    NavigationStack {
+                        LiveTVView(sourceManager: sourceManager)
+                    }
                 case .movies:
-                    MoviesView(sourceManager: sourceManager)
+                    NavigationStack {
+                        MoviesView(sourceManager: sourceManager)
+                    }
                 case .series:
-                    SeriesView(sourceManager: sourceManager)
+                    NavigationStack {
+                        SeriesView(sourceManager: sourceManager)
+                    }
                 case .settings:
-                    SettingsView(sourceManager: sourceManager)
+                    NavigationStack {
+                        SettingsView(sourceManager: sourceManager)
+                    }
                 }
             }
         }

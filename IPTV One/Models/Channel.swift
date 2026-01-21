@@ -10,14 +10,14 @@ import SwiftData
 
 @Model
 final class Channel {
-    var id: UUID
-    var name: String
-    var streamURL: String
+    var id: UUID = UUID()
+    var name: String = ""
+    var streamURL: String = ""
     var logoURL: String?
-    var categoryName: String
+    var categoryName: String = "Uncategorized"
     var epgID: String?
     var tvgName: String?
-    var isFavorite: Bool
+    var isFavorite: Bool = false
     var lastWatched: Date?
     
     @Relationship(inverse: \Source.channels)

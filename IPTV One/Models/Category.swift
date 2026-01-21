@@ -10,14 +10,19 @@ import SwiftData
 
 @Model
 final class Category {
-    var id: UUID
-    var name: String
-    var type: CategoryType
+    var id: UUID = UUID()
+    var name: String = ""
+    var typeRawValue: String = CategoryType.live.rawValue
+    
+    var type: CategoryType {
+        get { CategoryType(rawValue: typeRawValue) ?? .live }
+        set { typeRawValue = newValue.rawValue }
+    }
     
     init(id: UUID = UUID(), name: String, type: CategoryType) {
         self.id = id
         self.name = name
-        self.type = type
+        self.typeRawValue = type.rawValue
     }
 }
 

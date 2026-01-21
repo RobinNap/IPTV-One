@@ -43,7 +43,7 @@ struct SeriesView: View {
             Color.darkBackground.ignoresSafeArea()
             
             if sourceManager.isLoading {
-                LoadingView(message: sourceManager.loadingMessage)
+                LoadingView(message: sourceManager.loadingMessage, progress: sourceManager.loadingProgress)
             } else if allSeries.isEmpty {
                 emptyState
             } else {

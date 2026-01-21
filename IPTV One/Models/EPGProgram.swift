@@ -10,12 +10,12 @@ import SwiftData
 
 @Model
 final class EPGProgram {
-    var id: UUID
-    var channelID: String
-    var title: String
+    var id: UUID = UUID()
+    var channelID: String = ""
+    var title: String = ""
     var programDescription: String?
-    var startTime: Date
-    var endTime: Date
+    var startTime: Date = Date()
+    var endTime: Date = Date()
     var category: String?
     var iconURL: String?
     

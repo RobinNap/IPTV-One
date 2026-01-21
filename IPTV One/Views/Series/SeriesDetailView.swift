@@ -16,7 +16,7 @@ struct SeriesDetailView: View {
     @State private var showingPlayer = false
     
     private var sortedSeasons: [Season] {
-        series.seasons.sorted { $0.seasonNumber < $1.seasonNumber }
+        series.seasonsList.sorted { $0.seasonNumber < $1.seasonNumber }
     }
     
     var body: some View {
@@ -129,7 +129,7 @@ struct SeriesDetailView: View {
     }
     
     private var totalEpisodes: Int {
-        sortedSeasons.reduce(0) { $0 + $1.episodes.count }
+        sortedSeasons.reduce(0) { $0 + $1.episodesList.count }
     }
     
     private var seasonPicker: some View {
@@ -164,7 +164,7 @@ struct SeriesDetailView: View {
     }
     
     private func episodeList(for season: Season) -> some View {
-        let sortedEpisodes = season.episodes.sorted { $0.episodeNumber < $1.episodeNumber }
+        let sortedEpisodes = season.episodesList.sorted { $0.episodeNumber < $1.episodeNumber }
         
         return VStack(alignment: .leading, spacing: 12) {
             Text("Episodes")

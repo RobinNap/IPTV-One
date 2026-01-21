@@ -10,20 +10,20 @@ import SwiftData
 
 @Model
 final class Movie {
-    var id: UUID
-    var name: String
-    var streamURL: String
+    var id: UUID = UUID()
+    var name: String = ""
+    var streamURL: String = ""
     var posterURL: String?
-    var categoryName: String
+    var categoryName: String = "Uncategorized"
     var plot: String?
     var year: String?
     var rating: String?
     var duration: String?
     var director: String?
     var cast: String?
-    var isFavorite: Bool
+    var isFavorite: Bool = false
     var lastWatched: Date?
-    var watchProgress: Double
+    var watchProgress: Double = 0
     
     @Relationship(inverse: \Source.movies)
     var source: Source?

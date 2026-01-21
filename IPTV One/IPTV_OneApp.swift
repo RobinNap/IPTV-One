@@ -49,10 +49,8 @@ struct IPTV_OneApp: App {
     
     var body: some Scene {
         WindowGroup {
-            NavigationStack {
-                MainTabView()
-            }
-            .preferredColorScheme(.dark)
+            MainTabView()
+                .preferredColorScheme(.dark)
         }
         .modelContainer(sharedModelContainer)
         #if os(macOS)

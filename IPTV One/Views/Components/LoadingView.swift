@@ -9,6 +9,7 @@ import SwiftUI
 
 struct LoadingView: View {
     var message: String = "Loading..."
+    var progress: Double? = nil
     
     @State private var isAnimating = false
     
@@ -20,25 +21,47 @@ struct LoadingView: View {
                     .stroke(Color.white.opacity(0.1), lineWidth: 4)
                     .frame(width: 50, height: 50)
                 
-                Circle()
-                    .trim(from: 0, to: 0.7)
-                    .stroke(
-                        LinearGradient.accentGradient,
-                        style: StrokeStyle(lineWidth: 4, lineCap: .round)
-                    )
-                    .frame(width: 50, height: 50)
-                    .rotationEffect(.degrees(isAnimating ? 360 : 0))
-                    .animation(
-                        .linear(duration: 1)
-                        .repeatForever(autoreverses: false),
-                        value: isAnimating
-                    )
+                if let progress, progress > 0 {
+                    // Progress circle
+                    Circle()
+                        .trim(from: 0, to: progress)
+                        .stroke(
+                            LinearGradient.accentGradient,
+                            style: StrokeStyle(lineWidth: 4, lineCap: .round)
+                        )
+                        .frame(width: 50, height: 50)
+                        .rotationEffect(.degrees(-90))
+                        .animation(.easeInOut(duration: 0.3), value: progress)
+                } else {
+                    // Indeterminate spinner
+                    Circle()
+                        .trim(from: 0, to: 0.7)
+                        .stroke(
+                            LinearGradient.accentGradient,
+                            style: StrokeStyle(lineWidth: 4, lineCap: .round)
+                        )
+                        .frame(width: 50, height: 50)
+                        .rotationEffect(.degrees(isAnimating ? 360 : 0))
+                        .animation(
+                            .linear(duration: 1)
+                            .repeatForever(autoreverses: false),
+                            value: isAnimating
+                        )
+                }
             }
             
-            Text(message)
-                .font(.system(size: 15, weight: .medium))
-                .foregroundStyle(.secondary)
-                .multilineTextAlignment(.center)
+            VStack(spacing: 8) {
+                Text(message)
+                    .font(.system(size: 15, weight: .medium))
+                    .foregroundStyle(.secondary)
+                    .multilineTextAlignment(.center)
+                
+                if let progress, progress > 0 {
+                    Text("\(Int(progress * 100))%")
+                        .font(.system(size: 13, weight: .semibold, design: .monospaced))
+                        .foregroundStyle(Color.primaryAccent)
+                }
+            }
         }
         .frame(maxWidth: .infinity, maxHeight: .infinity)
         .background(Color.darkBackground)
@@ -94,6 +117,10 @@ struct EmptyStateView: View {
 
 #Preview("Loading") {
     LoadingView(message: "Loading channels...")
+}
+
+#Preview("Loading with Progress") {
+    LoadingView(message: "Processing items... (500/1000)", progress: 0.5)
 }
 
 #Preview("Empty State") {

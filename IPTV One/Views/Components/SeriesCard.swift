@@ -14,11 +14,11 @@ struct SeriesCard: View {
     @State private var isHovered = false
     
     private var seasonCount: Int {
-        series.seasons.count
+        series.seasonsList.count
     }
     
     private var episodeCount: Int {
-        series.seasons.reduce(0) { $0 + $1.episodes.count }
+        series.seasonsList.reduce(0) { $0 + $1.episodesList.count }
     }
     
     var body: some View {

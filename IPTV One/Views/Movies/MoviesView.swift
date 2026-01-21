@@ -49,7 +49,7 @@ struct MoviesView: View {
             Color.darkBackground.ignoresSafeArea()
             
             if sourceManager.isLoading {
-                LoadingView(message: sourceManager.loadingMessage)
+                LoadingView(message: sourceManager.loadingMessage, progress: sourceManager.loadingProgress)
             } else if allMovies.isEmpty {
                 emptyState
             } else {

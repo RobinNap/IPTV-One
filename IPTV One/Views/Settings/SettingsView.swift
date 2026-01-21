@@ -15,20 +15,28 @@ struct SettingsView: View {
     @Query private var sources: [Source]
     
     @State private var showingAddSource = false
+    @State private var showingError = false
     
     var body: some View {
         ZStack {
             Color.darkBackground.ignoresSafeArea()
             
-            ScrollView {
-                LazyVStack(alignment: .leading, spacing: 24) {
-                    // Sources Section
-                    sourcesSection
-                    
-                    // App Info Section
-                    appInfoSection
+            if sourceManager.isLoading {
+                LoadingView(
+                    message: sourceManager.loadingMessage,
+                    progress: sourceManager.loadingProgress
+                )
+            } else {
+                ScrollView {
+                    LazyVStack(alignment: .leading, spacing: 24) {
+                        // Sources Section
+                        sourcesSection
+                        
+                        // App Info Section
+                        appInfoSection
+                    }
+                    .padding(16)
                 }
-                .padding(16)
             }
         }
         .navigationTitle("Settings")
@@ -41,6 +49,18 @@ struct SettingsView: View {
                 Task {
                     await sourceManager.loadSource(source)
                 }
+            }
+        }
+        .alert("Error Loading Source", isPresented: $showingError) {
+            Button("OK") {
+                sourceManager.clearError()
+            }
+        } message: {
+            Text(sourceManager.errorMessage ?? "An unknown error occurred")
+        }
+        .onChange(of: sourceManager.errorMessage) { _, newValue in
+            if newValue != nil {
+                showingError = true
             }
         }
     }
@@ -78,9 +98,10 @@ struct SettingsView: View {
                         .font(.system(size: 16, weight: .semibold))
                         .foregroundStyle(.white)
                     
-                    Text("Add an M3U source to get started")
+                    Text("Add an M3U source or Xtream Codes account to get started")
                         .font(.system(size: 14))
                         .foregroundStyle(.secondary)
+                        .multilineTextAlignment(.center)
                 }
                 .frame(maxWidth: .infinity)
                 .padding(.vertical, 40)
@@ -147,10 +168,31 @@ struct SourceRow: View {
     
     @State private var showingDeleteConfirmation = false
     
+    private var contentCount: String {
+        let channels = source.channelsList.count
+        let movies = source.moviesList.count
+        let series = source.seriesList.count
+        
+        var parts: [String] = []
+        if channels > 0 { parts.append("\(channels) channels") }
+        if movies > 0 { parts.append("\(movies) movies") }
+        if series > 0 { parts.append("\(series) series") }
+        
+        return parts.isEmpty ? "No content" : parts.joined(separator: ", ")
+    }
+    
+    private var sourceTypeIcon: String {
+        source.sourceType == .xtream ? "server.rack" : "doc.text"
+    }
+    
+    private var sourceTypeLabel: String {
+        source.sourceType == .xtream ? "Xtream" : "M3U"
+    }
+    
     var body: some View {
         HStack(spacing: 12) {
             // Icon
-            Image(systemName: "antenna.radiowaves.left.and.right")
+            Image(systemName: sourceTypeIcon)
                 .font(.system(size: 20))
                 .foregroundStyle(Color.primaryAccent)
                 .frame(width: 40, height: 40)
@@ -163,15 +205,29 @@ struct SourceRow: View {
                     .font(.system(size: 15, weight: .semibold))
                     .foregroundStyle(.white)
                 
+                HStack(spacing: 6) {
+                    Text(sourceTypeLabel)
+                        .font(.system(size: 11, weight: .medium))
+                        .foregroundStyle(.white)
+                        .padding(.horizontal, 6)
+                        .padding(.vertical, 2)
+                        .background(Color.primaryAccent.opacity(0.3))
+                        .clipShape(Capsule())
+                    
+                    Text(contentCount)
+                        .font(.system(size: 12))
+                        .foregroundStyle(.secondary)
+                }
+                
                 HStack(spacing: 8) {
                     if let lastUpdated = source.lastUpdated {
                         Text("Updated \(lastUpdated.relativeTimeString())")
-                            .font(.system(size: 12))
+                            .font(.system(size: 11))
                             .foregroundStyle(.secondary)
                     } else {
                         Text("Not synced")
-                            .font(.system(size: 12))
-                            .foregroundStyle(.secondary)
+                            .font(.system(size: 11))
+                            .foregroundStyle(.orange)
                     }
                 }
             }
@@ -222,19 +278,30 @@ struct SourceRow: View {
 
 // MARK: - Add Source View
 
+enum SourceInputType: String, CaseIterable {
+    case m3u = "M3U URL"
+    case xtream = "Xtream"
+}
+
 struct AddSourceView: View {
     var onAdd: (Source) -> Void
     
     @Environment(\.dismiss) private var dismiss
     
+    @State private var sourceInputType: SourceInputType = .m3u
     @State private var name = ""
     @State private var url = ""
+    @State private var serverURL = ""
     @State private var username = ""
     @State private var password = ""
-    @State private var useCredentials = false
     
     var isValid: Bool {
-        !name.isEmpty && !url.isEmpty && URL(string: url) != nil
+        switch sourceInputType {
+        case .m3u:
+            return !name.isEmpty && !url.isEmpty && URL(string: url) != nil
+        case .xtream:
+            return !name.isEmpty && !serverURL.isEmpty && !username.isEmpty && !password.isEmpty
+        }
     }
     
     var body: some View {
@@ -244,73 +311,39 @@ struct AddSourceView: View {
                 
                 ScrollView {
                     VStack(alignment: .leading, spacing: 24) {
+                        // Source Type Picker
+                        VStack(alignment: .leading, spacing: 8) {
+                            Text("Source Type")
+                                .font(.system(size: 14, weight: .medium))
+                                .foregroundStyle(.secondary)
+                            
+                            Picker("Source Type", selection: $sourceInputType) {
+                                ForEach(SourceInputType.allCases, id: \.self) { type in
+                                    Text(type.rawValue).tag(type)
+                                }
+                            }
+                            .pickerStyle(.segmented)
+                        }
+                        
                         // Name
                         VStack(alignment: .leading, spacing: 8) {
                             Text("Source Name")
                                 .font(.system(size: 14, weight: .medium))
                                 .foregroundStyle(.secondary)
                             
-                            TextField("My Source", text: $name)
+                            TextField("My IPTV", text: $name)
                                 .textFieldStyle(IPTVTextFieldStyle())
                         }
                         
-                        // URL
-                        VStack(alignment: .leading, spacing: 8) {
-                            Text("M3U URL")
-                                .font(.system(size: 14, weight: .medium))
-                                .foregroundStyle(.secondary)
-                            
-                            TextField("http://example.com/playlist.m3u", text: $url)
-                                .textFieldStyle(IPTVTextFieldStyle())
-                                #if os(iOS)
-                                .keyboardType(.URL)
-                                .autocapitalization(.none)
-                                #endif
+                        // Input fields based on type
+                        if sourceInputType == .m3u {
+                            m3uFields
+                        } else {
+                            xtreamFields
                         }
                         
-                        // Credentials toggle
-                        Toggle(isOn: $useCredentials) {
-                            VStack(alignment: .leading, spacing: 4) {
-                                Text("Use Credentials")
-                                    .font(.system(size: 15, weight: .medium))
-                                    .foregroundStyle(.white)
-                                
-                                Text("Some providers require username and password")
-                                    .font(.system(size: 12))
-                                    .foregroundStyle(.secondary)
-                            }
-                        }
-                        .tint(.primaryAccent)
-                        .padding(16)
-                        .background(Color.darkCardBackground)
-                        .clipShape(RoundedRectangle(cornerRadius: 12))
-                        
-                        // Credentials fields
-                        if useCredentials {
-                            VStack(alignment: .leading, spacing: 16) {
-                                VStack(alignment: .leading, spacing: 8) {
-                                    Text("Username")
-                                        .font(.system(size: 14, weight: .medium))
-                                        .foregroundStyle(.secondary)
-                                    
-                                    TextField("Username", text: $username)
-                                        .textFieldStyle(IPTVTextFieldStyle())
-                                        #if os(iOS)
-                                        .autocapitalization(.none)
-                                        #endif
-                                }
-                                
-                                VStack(alignment: .leading, spacing: 8) {
-                                    Text("Password")
-                                        .font(.system(size: 14, weight: .medium))
-                                        .foregroundStyle(.secondary)
-                                    
-                                    SecureField("Password", text: $password)
-                                        .textFieldStyle(IPTVTextFieldStyle())
-                                }
-                            }
-                            .transition(.opacity.combined(with: .move(edge: .top)))
-                        }
+                        // Help text
+                        helpText
                     }
                     .padding(16)
                 }
@@ -328,20 +361,106 @@ struct AddSourceView: View {
                 
                 ToolbarItem(placement: .confirmationAction) {
                     Button("Add") {
-                        let source = Source(
-                            name: name,
-                            url: url,
-                            username: useCredentials ? username : nil,
-                            password: useCredentials ? password : nil
-                        )
-                        onAdd(source)
-                        dismiss()
+                        addSource()
                     }
                     .disabled(!isValid)
                 }
             }
-            .animation(.smoothSpring, value: useCredentials)
+            .animation(.smoothSpring, value: sourceInputType)
         }
+    }
+    
+    private var m3uFields: some View {
+        VStack(alignment: .leading, spacing: 8) {
+            Text("M3U URL")
+                .font(.system(size: 14, weight: .medium))
+                .foregroundStyle(.secondary)
+            
+            TextField("http://example.com/playlist.m3u", text: $url)
+                .textFieldStyle(IPTVTextFieldStyle())
+                #if os(iOS)
+                .keyboardType(.URL)
+                .autocapitalization(.none)
+                .autocorrectionDisabled()
+                #endif
+        }
+    }
+    
+    private var xtreamFields: some View {
+        VStack(alignment: .leading, spacing: 16) {
+            VStack(alignment: .leading, spacing: 8) {
+                Text("Server URL")
+                    .font(.system(size: 14, weight: .medium))
+                    .foregroundStyle(.secondary)
+                
+                TextField("http://server.com:port", text: $serverURL)
+                    .textFieldStyle(IPTVTextFieldStyle())
+                    #if os(iOS)
+                    .keyboardType(.URL)
+                    .autocapitalization(.none)
+                    .autocorrectionDisabled()
+                    #endif
+            }
+            
+            VStack(alignment: .leading, spacing: 8) {
+                Text("Username")
+                    .font(.system(size: 14, weight: .medium))
+                    .foregroundStyle(.secondary)
+                
+                TextField("Username", text: $username)
+                    .textFieldStyle(IPTVTextFieldStyle())
+                    #if os(iOS)
+                    .autocapitalization(.none)
+                    .autocorrectionDisabled()
+                    #endif
+            }
+            
+            VStack(alignment: .leading, spacing: 8) {
+                Text("Password")
+                    .font(.system(size: 14, weight: .medium))
+                    .foregroundStyle(.secondary)
+                
+                SecureField("Password", text: $password)
+                    .textFieldStyle(IPTVTextFieldStyle())
+            }
+        }
+    }
+    
+    private var helpText: some View {
+        Group {
+            if sourceInputType == .m3u {
+                Text("Enter the full M3U URL from your IPTV provider. The URL usually ends with .m3u or includes parameters like type=m3u_plus")
+            } else {
+                Text("Enter your Xtream credentials. The server URL is usually in the format http://server.com:port (without /player_api.php)")
+            }
+        }
+        .font(.system(size: 12))
+        .foregroundStyle(.secondary)
+        .padding(.top, 8)
+    }
+    
+    private func addSource() {
+        let source: Source
+        
+        switch sourceInputType {
+        case .m3u:
+            source = Source(
+                name: name,
+                url: url,
+                sourceType: .m3u
+            )
+        case .xtream:
+            source = Source(
+                name: name,
+                url: serverURL,
+                username: username,
+                password: password,
+                sourceType: .xtream
+            )
+        }
+        
+        onAdd(source)
+        dismiss()
     }
 }
 

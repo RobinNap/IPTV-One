@@ -7,7 +7,7 @@
 
 import Foundation
 
-struct EPGProgramData {
+struct EPGProgramData: Sendable {
     var channelID: String
     var title: String
     var description: String?
@@ -39,7 +39,7 @@ actor EPGService {
         }
         
         let data = try await NetworkService.shared.fetchData(from: url, useCache: false)
-        let programs = try parseXMLTV(data: data)
+        let programs = try await parseXMLTV(data: data)
         
         // Group by channel ID
         var grouped: [String: [EPGProgramData]] = [:]
@@ -87,13 +87,17 @@ actor EPGService {
         lastUpdate = nil
     }
     
-    private func parseXMLTV(data: Data) throws -> [EPGProgramData] {
-        let parser = XMLTVParser()
-        return try parser.parse(data: data)
+    private func parseXMLTV(data: Data) async throws -> [EPGProgramData] {
+        // Run XML parsing on MainActor since XMLParserDelegate requires it
+        try await MainActor.run {
+            let parser = XMLTVParser()
+            return try parser.parse(data: data)
+        }
     }
 }
 
 // XMLTV Parser
+@MainActor
 private class XMLTVParser: NSObject, XMLParserDelegate {
     private var programs: [EPGProgramData] = []
     private var currentElement: String = ""
