@@ -17,6 +17,14 @@ class SourceManager {
     var error: Error?
     var errorMessage: String?
     
+    // Granular loading states for progressive/background loading
+    var isLoadingChannels = false
+    var isLoadingMovies = false
+    var isLoadingSeries = false
+    var channelsLoaded = false
+    var moviesLoaded = false
+    var seriesLoaded = false
+    
     private var modelContext: ModelContext?
     
     func setModelContext(_ context: ModelContext) {
@@ -43,6 +51,12 @@ class SourceManager {
         }
         
         isLoading = true
+        isLoadingChannels = true
+        isLoadingMovies = true
+        isLoadingSeries = true
+        channelsLoaded = false
+        moviesLoaded = false
+        seriesLoaded = false
         loadingMessage = "Connecting to server..."
         loadingProgress = 0
         error = nil
@@ -104,7 +118,7 @@ class SourceManager {
         }
     }
     
-    // MARK: - Xtream Codes Loading
+    // MARK: - Xtream Codes Loading (Progressive/Background)
     
     @MainActor
     private func loadXtreamSource(_ source: Source) async {
@@ -118,7 +132,14 @@ class SourceManager {
             return
         }
         
+        // Reset all loading states
         isLoading = true
+        isLoadingChannels = true
+        isLoadingMovies = true
+        isLoadingSeries = true
+        channelsLoaded = false
+        moviesLoaded = false
+        seriesLoaded = false
         loadingMessage = "Authenticating..."
         loadingProgress = 0
         error = nil
@@ -131,19 +152,21 @@ class SourceManager {
             let authResponse = try await XtreamService.shared.authenticate(credentials: credentials)
             print("[SourceManager] Authenticated as: \(authResponse.userInfo?.username ?? "unknown")")
             
-            loadingProgress = 0.1
+            loadingProgress = 0.05
             
             // Clear existing content
             loadingMessage = "Clearing old content..."
             await clearSourceContent(source, modelContext: modelContext)
             
-            loadingProgress = 0.15
+            loadingProgress = 0.1
             
-            // Fetch categories
+            // Fetch all categories in parallel (they're small and fast)
             loadingMessage = "Fetching categories..."
-            let liveCategories = try await XtreamService.shared.getLiveCategories(credentials: credentials)
-            let vodCategories = try await XtreamService.shared.getVodCategories(credentials: credentials)
-            let seriesCategories = try await XtreamService.shared.getSeriesCategories(credentials: credentials)
+            async let liveCategoriesTask = XtreamService.shared.getLiveCategories(credentials: credentials)
+            async let vodCategoriesTask = XtreamService.shared.getVodCategories(credentials: credentials)
+            async let seriesCategoriesTask = XtreamService.shared.getSeriesCategories(credentials: credentials)
+            
+            let (liveCategories, vodCategories, seriesCategories) = try await (liveCategoriesTask, vodCategoriesTask, seriesCategoriesTask)
             
             let liveCategoryMap = Dictionary(uniqueKeysWithValues: liveCategories.compactMap { cat -> (String, String)? in
                 guard let id = cat.categoryId, let name = cat.categoryName else { return nil }
@@ -158,14 +181,18 @@ class SourceManager {
                 return (id, name)
             })
             
-            loadingProgress = 0.2
+            loadingProgress = 0.15
             
-            // Fetch live streams
-            loadingMessage = "Fetching live channels..."
+            // ======== PROGRESSIVE LOADING ========
+            // Load channels first (usually what users want first), save immediately
+            // Then load movies and series in background while user can browse channels
+            
+            // 1. CHANNELS - Load and save immediately so user can start browsing
+            loadingMessage = "Loading live channels..."
             let liveStreams = try await XtreamService.shared.getLiveStreams(credentials: credentials)
             print("[SourceManager] Found \(liveStreams.count) live channels")
             
-            loadingProgress = 0.35
+            loadingProgress = 0.3
             
             var channelCount = 0
             for stream in liveStreams {
@@ -186,14 +213,21 @@ class SourceManager {
                 channelCount += 1
             }
             
-            loadingProgress = 0.5
+            // Save channels immediately - user can now browse Live TV!
+            try modelContext.save()
+            isLoadingChannels = false
+            channelsLoaded = true
+            isLoading = false  // Stop blocking UI - channels are ready!
+            print("[SourceManager] ✓ Channels loaded: \(channelCount) - User can now browse!")
             
-            // Fetch VOD streams
-            loadingMessage = "Fetching movies..."
+            loadingProgress = 0.4
+            
+            // 2. MOVIES - Load in background while user might be browsing channels
+            loadingMessage = "Loading movies..."
             let vodStreams = try await XtreamService.shared.getVodStreams(credentials: credentials)
             print("[SourceManager] Found \(vodStreams.count) movies")
             
-            loadingProgress = 0.65
+            loadingProgress = 0.6
             
             var movieCount = 0
             for stream in vodStreams {
@@ -214,14 +248,20 @@ class SourceManager {
                 movieCount += 1
             }
             
-            loadingProgress = 0.75
+            // Save movies - user can now browse Movies!
+            try modelContext.save()
+            isLoadingMovies = false
+            moviesLoaded = true
+            print("[SourceManager] ✓ Movies loaded: \(movieCount)")
             
-            // Fetch series
-            loadingMessage = "Fetching series..."
+            loadingProgress = 0.8
+            
+            // 3. SERIES - Load in background (basic info only, episodes loaded lazily)
+            loadingMessage = "Loading series..."
             let seriesList = try await XtreamService.shared.getSeries(credentials: credentials)
             print("[SourceManager] Found \(seriesList.count) series")
             
-            loadingProgress = 0.85
+            loadingProgress = 0.9
             
             var seriesCount = 0
             for seriesItem in seriesList {
@@ -229,6 +269,7 @@ class SourceManager {
                 
                 let categoryName = seriesItem.categoryId.flatMap { seriesCategoryMap[$0] } ?? "Uncategorized"
                 
+                // Only store basic series info - episodes will be loaded on-demand
                 let series = Series(
                     name: seriesItem.name ?? "Unknown",
                     posterURL: seriesItem.cover,
@@ -236,62 +277,31 @@ class SourceManager {
                     plot: seriesItem.plot,
                     rating: seriesItem.rating,
                     cast: seriesItem.cast,
-                    director: seriesItem.director
+                    director: seriesItem.director,
+                    xtreamSeriesId: seriesId
                 )
                 series.source = source
-                
-                // Fetch series details for episodes
-                do {
-                    let seriesInfo = try await XtreamService.shared.getSeriesInfo(credentials: credentials, seriesId: seriesId)
-                    
-                    if let episodes = seriesInfo.episodes {
-                        // Group episodes by season
-                        for (seasonNum, seasonEpisodes) in episodes.sorted(by: { Int($0.key) ?? 0 < Int($1.key) ?? 0 }) {
-                            let season = Season(seasonNumber: Int(seasonNum) ?? 1)
-                            season.series = series
-                            
-                            for ep in seasonEpisodes.sorted(by: { ($0.episodeNum?.value ?? 0) < ($1.episodeNum?.value ?? 0) }) {
-                                guard let epId = ep.id, let epIdInt = Int(epId) else { continue }
-                                
-                                let epNum = ep.episodeNum?.value ?? 1
-                                let ext = ep.containerExtension ?? "mp4"
-                                let episode = Episode(
-                                    episodeNumber: epNum,
-                                    name: ep.title ?? "Episode \(epNum)",
-                                    streamURL: credentials.seriesStreamURL(streamId: epIdInt, extension: ext),
-                                    plot: ep.info?.plot,
-                                    duration: ep.info?.duration,
-                                    stillURL: ep.info?.movieImage
-                                )
-                                episode.season = season
-                                season.episodesList.append(episode)
-                            }
-                            
-                            series.seasonsList.append(season)
-                        }
-                    }
-                } catch {
-                    // Continue without episode details
-                    print("[SourceManager] Failed to fetch details for series \(seriesId): \(error)")
-                }
-                
                 modelContext.insert(series)
                 seriesCount += 1
             }
             
-            loadingProgress = 0.95
+            // Save series
+            try modelContext.save()
+            isLoadingSeries = false
+            seriesLoaded = true
+            print("[SourceManager] ✓ Series loaded: \(seriesCount)")
             
+            loadingProgress = 1.0
             source.lastUpdated = Date()
-            
-            loadingMessage = "Saving..."
             try modelContext.save()
             
-            print("[SourceManager] Xtream load complete!")
+            print("[SourceManager] ✓ Xtream load complete!")
             print("  - Channels: \(channelCount)")
             print("  - Movies: \(movieCount)")
             print("  - Series: \(seriesCount)")
             
-            finishLoading()
+            loadingMessage = ""
+            loadingProgress = 0
             
         } catch {
             handleError(error)
@@ -449,6 +459,12 @@ class SourceManager {
         Task {
             try? await Task.sleep(nanoseconds: 500_000_000)
             isLoading = false
+            isLoadingChannels = false
+            isLoadingMovies = false
+            isLoadingSeries = false
+            channelsLoaded = true
+            moviesLoaded = true
+            seriesLoaded = true
             loadingMessage = ""
             loadingProgress = 0
         }
@@ -460,6 +476,9 @@ class SourceManager {
         self.error = error
         self.errorMessage = error.localizedDescription
         isLoading = false
+        isLoadingChannels = false
+        isLoadingMovies = false
+        isLoadingSeries = false
         loadingMessage = ""
         loadingProgress = 0
     }
@@ -467,5 +486,91 @@ class SourceManager {
     func clearError() {
         error = nil
         errorMessage = nil
+    }
+    
+    // MARK: - Lazy Loading for Series Episodes
+    
+    /// Loads episodes for a series on-demand (lazy loading)
+    /// This is called when the user opens a series detail view
+    @MainActor
+    func loadSeriesEpisodes(_ series: Series) async -> Bool {
+        guard let modelContext else {
+            print("[SourceManager] Model context not set for lazy loading")
+            return false
+        }
+        
+        // Already loaded or no Xtream ID
+        guard !series.episodesLoaded else {
+            print("[SourceManager] Episodes already loaded for: \(series.name)")
+            return true
+        }
+        
+        guard let seriesId = series.xtreamSeriesId,
+              let source = series.source,
+              let credentials = source.xtreamCredentials else {
+            // Not an Xtream series or missing credentials - mark as loaded to avoid retrying
+            series.episodesLoaded = true
+            return true
+        }
+        
+        print("[SourceManager] Lazy loading episodes for: \(series.name) (ID: \(seriesId))")
+        
+        do {
+            let seriesInfo = try await XtreamService.shared.getSeriesInfo(credentials: credentials, seriesId: seriesId)
+            
+            // Clear any existing seasons (shouldn't be any, but just in case)
+            for season in series.seasonsList {
+                modelContext.delete(season)
+            }
+            series.seasons = []
+            
+            if let episodes = seriesInfo.episodes {
+                // Group episodes by season
+                for (seasonNum, seasonEpisodes) in episodes.sorted(by: { Int($0.key) ?? 0 < Int($1.key) ?? 0 }) {
+                    let season = Season(seasonNumber: Int(seasonNum) ?? 1)
+                    season.series = series
+                    
+                    for ep in seasonEpisodes.sorted(by: { ($0.episodeNum?.value ?? 0) < ($1.episodeNum?.value ?? 0) }) {
+                        guard let epId = ep.id, let epIdInt = Int(epId) else { continue }
+                        
+                        let epNum = ep.episodeNum?.value ?? 1
+                        let ext = ep.containerExtension ?? "mp4"
+                        let episode = Episode(
+                            episodeNumber: epNum,
+                            name: ep.title ?? "Episode \(epNum)",
+                            streamURL: credentials.seriesStreamURL(streamId: epIdInt, extension: ext),
+                            plot: ep.info?.plot,
+                            duration: ep.info?.duration,
+                            stillURL: ep.info?.movieImage
+                        )
+                        episode.season = season
+                        season.episodesList.append(episode)
+                    }
+                    
+                    series.seasonsList.append(season)
+                }
+            }
+            
+            // Update additional info from detailed response
+            if let info = seriesInfo.info {
+                if let plot = info.plot, series.plot == nil {
+                    series.plot = plot
+                }
+                if let rating = info.rating, series.rating == nil {
+                    series.rating = rating
+                }
+            }
+            
+            series.episodesLoaded = true
+            try modelContext.save()
+            
+            print("[SourceManager] Loaded \(series.seasonsList.count) seasons with episodes for: \(series.name)")
+            return true
+            
+        } catch {
+            print("[SourceManager] Failed to lazy load episodes for \(series.name): \(error)")
+            // Don't mark as loaded so it can be retried
+            return false
+        }
     }
 }

@@ -21,6 +21,10 @@ final class Series {
     var director: String?
     var isFavorite: Bool = false
     
+    // Xtream-specific: Store the series ID for lazy loading episodes
+    var xtreamSeriesId: Int?
+    var episodesLoaded: Bool = false
+    
     @Relationship(deleteRule: .cascade)
     var seasons: [Season]?
     
@@ -37,7 +41,8 @@ final class Series {
         rating: String? = nil,
         cast: String? = nil,
         director: String? = nil,
-        isFavorite: Bool = false
+        isFavorite: Bool = false,
+        xtreamSeriesId: Int? = nil
     ) {
         self.id = id
         self.name = name
@@ -49,6 +54,8 @@ final class Series {
         self.cast = cast
         self.director = director
         self.isFavorite = isFavorite
+        self.xtreamSeriesId = xtreamSeriesId
+        self.episodesLoaded = false
         self.seasons = []
     }
     

@@ -48,7 +48,8 @@ struct MoviesView: View {
         ZStack {
             Color.darkBackground.ignoresSafeArea()
             
-            if sourceManager.isLoading {
+            // Show full loading screen only before any movies are loaded
+            if sourceManager.isLoadingMovies && allMovies.isEmpty {
                 LoadingView(message: sourceManager.loadingMessage, progress: sourceManager.loadingProgress)
             } else if allMovies.isEmpty {
                 emptyState
@@ -91,6 +92,11 @@ struct MoviesView: View {
     private var movieGrid: some View {
         ScrollView {
             LazyVStack(alignment: .leading, spacing: 20) {
+                // Background loading indicator
+                if sourceManager.isLoadingSeries {
+                    BackgroundLoadingBanner(message: sourceManager.loadingMessage)
+                }
+                
                 // Search
                 SearchBar(text: $searchText, placeholder: "Search movies...")
                     .padding(.horizontal, 16)

@@ -42,7 +42,8 @@ struct SeriesView: View {
         ZStack {
             Color.darkBackground.ignoresSafeArea()
             
-            if sourceManager.isLoading {
+            // Show full loading screen only before any series are loaded
+            if sourceManager.isLoadingSeries && allSeries.isEmpty {
                 LoadingView(message: sourceManager.loadingMessage, progress: sourceManager.loadingProgress)
             } else if allSeries.isEmpty {
                 emptyState
@@ -55,7 +56,7 @@ struct SeriesView: View {
         .navigationBarTitleDisplayMode(.large)
         #endif
         .navigationDestination(item: $selectedSeries) { series in
-            SeriesDetailView(series: series)
+            SeriesDetailView(series: series, sourceManager: sourceManager)
         }
     }
     

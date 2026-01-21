@@ -10,10 +10,13 @@ import SwiftData
 
 struct SeriesDetailView: View {
     let series: Series
+    var sourceManager: SourceManager
     
     @State private var selectedSeason: Season?
     @State private var selectedEpisode: Episode?
     @State private var showingPlayer = false
+    @State private var isLoadingEpisodes = false
+    @State private var loadError: String?
     
     private var sortedSeasons: [Season] {
         series.seasonsList.sorted { $0.seasonNumber < $1.seasonNumber }
@@ -25,14 +28,24 @@ struct SeriesDetailView: View {
                 // Header
                 headerView
                 
-                // Season picker
-                if !sortedSeasons.isEmpty {
-                    seasonPicker
-                }
-                
-                // Episodes
-                if let season = selectedSeason {
-                    episodeList(for: season)
+                // Loading state for episodes
+                if isLoadingEpisodes {
+                    loadingView
+                } else if let error = loadError {
+                    errorView(error)
+                } else if sortedSeasons.isEmpty && series.episodesLoaded {
+                    // Episodes loaded but none found
+                    noEpisodesView
+                } else {
+                    // Season picker
+                    if !sortedSeasons.isEmpty {
+                        seasonPicker
+                    }
+                    
+                    // Episodes
+                    if let season = selectedSeason {
+                        episodeList(for: season)
+                    }
                 }
             }
             .padding(.bottom, 32)
@@ -42,10 +55,8 @@ struct SeriesDetailView: View {
         #if os(iOS)
         .navigationBarTitleDisplayMode(.inline)
         #endif
-        .onAppear {
-            if selectedSeason == nil {
-                selectedSeason = sortedSeasons.first
-            }
+        .task {
+            await loadEpisodesIfNeeded()
         }
         .fullScreenCover(isPresented: $showingPlayer) {
             if let episode = selectedEpisode {
@@ -56,6 +67,76 @@ struct SeriesDetailView: View {
                 )
             }
         }
+    }
+    
+    private func loadEpisodesIfNeeded() async {
+        // Skip if already loaded or already loading
+        guard !series.episodesLoaded && !isLoadingEpisodes else {
+            if selectedSeason == nil {
+                selectedSeason = sortedSeasons.first
+            }
+            return
+        }
+        
+        isLoadingEpisodes = true
+        loadError = nil
+        
+        let success = await sourceManager.loadSeriesEpisodes(series)
+        
+        isLoadingEpisodes = false
+        
+        if success {
+            selectedSeason = sortedSeasons.first
+        } else {
+            loadError = "Failed to load episodes. Tap to retry."
+        }
+    }
+    
+    private var loadingView: some View {
+        VStack(spacing: 16) {
+            ProgressView()
+                .scaleEffect(1.2)
+                .tint(.white)
+            Text("Loading episodes...")
+                .font(.system(size: 14))
+                .foregroundStyle(.secondary)
+        }
+        .frame(maxWidth: .infinity)
+        .padding(.vertical, 60)
+    }
+    
+    private func errorView(_ error: String) -> some View {
+        VStack(spacing: 12) {
+            Image(systemName: "exclamationmark.triangle")
+                .font(.system(size: 36))
+                .foregroundStyle(.orange)
+            Text(error)
+                .font(.system(size: 14))
+                .foregroundStyle(.secondary)
+                .multilineTextAlignment(.center)
+            Button("Retry") {
+                Task {
+                    await loadEpisodesIfNeeded()
+                }
+            }
+            .buttonStyle(.borderedProminent)
+            .tint(.primaryAccent)
+        }
+        .frame(maxWidth: .infinity)
+        .padding(.vertical, 60)
+    }
+    
+    private var noEpisodesView: some View {
+        VStack(spacing: 12) {
+            Image(systemName: "film.stack")
+                .font(.system(size: 36))
+                .foregroundStyle(.secondary)
+            Text("No episodes available")
+                .font(.system(size: 14))
+                .foregroundStyle(.secondary)
+        }
+        .frame(maxWidth: .infinity)
+        .padding(.vertical, 60)
     }
     
     private var headerView: some View {
@@ -287,6 +368,7 @@ struct EpisodeRow: View {
     NavigationStack {
         SeriesDetailView(series: {
             let s = Series(name: "Breaking Bad", year: "2008", rating: "9.5")
+            s.episodesLoaded = true
             let season1 = Season(seasonNumber: 1)
             season1.episodes = [
                 Episode(episodeNumber: 1, name: "Pilot", streamURL: "http://example.com"),
@@ -296,7 +378,7 @@ struct EpisodeRow: View {
             let season2 = Season(seasonNumber: 2)
             s.seasons = [season1, season2]
             return s
-        }())
+        }(), sourceManager: SourceManager())
     }
     .modelContainer(for: [Series.self], inMemory: true)
 }

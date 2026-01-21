@@ -32,12 +32,14 @@ actor NetworkService {
         cache.totalCostLimit = 50 * 1024 * 1024 // 50MB
     }
     
-    func fetchData(from url: URL, useCache: Bool = true) async throws -> Data {
+    func fetchData(from url: URL, useCache: Bool = true, verbose: Bool = true) async throws -> Data {
         let cacheKey = url.absoluteString as NSString
         
         // Check cache first
         if useCache, let cachedData = cache.object(forKey: cacheKey) {
-            print("[NetworkService] Cache hit for: \(url.absoluteString)")
+            if verbose {
+                print("[NetworkService] Cache hit for: \(url.absoluteString)")
+            }
             return cachedData as Data
         }
         
@@ -45,20 +47,23 @@ actor NetworkService {
         request.httpMethod = "GET"
         request.cachePolicy = .reloadIgnoringLocalCacheData
         
-        print("[NetworkService] Fetching: \(url.absoluteString)")
+        if verbose {
+            print("[NetworkService] Fetching: \(url.absoluteString)")
+        }
         
         do {
             let (data, response) = try await session.data(for: request)
-            
-            print("[NetworkService] Received \(data.count) bytes")
             
             guard let httpResponse = response as? HTTPURLResponse else {
                 print("[NetworkService] Error: Invalid response type")
                 throw NetworkError.invalidResponse
             }
             
-            print("[NetworkService] HTTP Status: \(httpResponse.statusCode)")
-            print("[NetworkService] Content-Type: \(httpResponse.value(forHTTPHeaderField: "Content-Type") ?? "unknown")")
+            if verbose {
+                print("[NetworkService] Received \(data.count) bytes")
+                print("[NetworkService] HTTP Status: \(httpResponse.statusCode)")
+                print("[NetworkService] Content-Type: \(httpResponse.value(forHTTPHeaderField: "Content-Type") ?? "unknown")")
+            }
             
             guard (200...299).contains(httpResponse.statusCode) else {
                 print("[NetworkService] Error: HTTP \(httpResponse.statusCode)")

@@ -44,7 +44,8 @@ struct LiveTVView: View {
         ZStack {
             Color.darkBackground.ignoresSafeArea()
             
-            if sourceManager.isLoading {
+            // Show full loading screen only before any channels are loaded
+            if sourceManager.isLoadingChannels && allChannels.isEmpty {
                 LoadingView(message: sourceManager.loadingMessage, progress: sourceManager.loadingProgress)
             } else if allChannels.isEmpty {
                 emptyState
@@ -81,6 +82,11 @@ struct LiveTVView: View {
     private var channelGrid: some View {
         ScrollView {
             LazyVStack(alignment: .leading, spacing: 16) {
+                // Background loading indicator
+                if sourceManager.isLoadingMovies || sourceManager.isLoadingSeries {
+                    BackgroundLoadingBanner(message: sourceManager.loadingMessage)
+                }
+                
                 // Search
                 SearchBar(text: $searchText, placeholder: "Search channels...")
                     .padding(.horizontal, 16)
