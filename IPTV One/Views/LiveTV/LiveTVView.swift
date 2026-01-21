@@ -20,7 +20,16 @@ struct LiveTVView: View {
     @State private var selectedChannel: Channel?
     @State private var epgData: [String: [EPGProgramData]] = [:]
     
+    /// Check if there's at least one configured source
+    private var hasActiveSource: Bool {
+        sources.contains { $0.isActive }
+    }
+    
+    /// Only return channels if there's an active source
     private var channels: [Channel] {
+        // No channels without an active source
+        guard hasActiveSource else { return [] }
+        
         var filtered = allChannels
         
         if !searchText.isEmpty {
@@ -37,19 +46,28 @@ struct LiveTVView: View {
     }
     
     private var categories: [String] {
-        Array(Set(allChannels.map { $0.categoryName })).sorted()
+        guard hasActiveSource else { return [] }
+        return Array(Set(allChannels.map { $0.categoryName })).sorted()
     }
     
     var body: some View {
         ZStack {
             Color.darkBackground.ignoresSafeArea()
             
-            // Show full loading screen only before any channels are loaded
-            if sourceManager.isLoadingChannels && allChannels.isEmpty {
+            // No source configured - show empty state
+            if sources.isEmpty {
+                noSourceState
+            }
+            // Show loading screen while loading channels
+            else if sourceManager.isLoadingChannels && channels.isEmpty {
                 LoadingView(message: sourceManager.loadingMessage, progress: sourceManager.loadingProgress)
-            } else if allChannels.isEmpty {
+            }
+            // Source exists but no channels yet
+            else if channels.isEmpty {
                 emptyState
-            } else {
+            }
+            // Show channels
+            else {
                 channelGrid
             }
         }
@@ -61,7 +79,8 @@ struct LiveTVView: View {
             VideoPlayerView(
                 title: channel.name,
                 streamURL: channel.streamURL,
-                posterURL: channel.logoURL
+                posterURL: channel.logoURL,
+                isLiveStream: true
             )
         }
         .task {
@@ -69,11 +88,21 @@ struct LiveTVView: View {
         }
     }
     
+    private var noSourceState: some View {
+        EmptyStateView(
+            icon: "plus.circle",
+            title: "No Source Configured",
+            message: "Add an IPTV source in Settings to start watching live TV.",
+            actionTitle: nil,
+            action: nil
+        )
+    }
+    
     private var emptyState: some View {
         EmptyStateView(
             icon: "antenna.radiowaves.left.and.right",
             title: "No Channels",
-            message: "Add a source in Settings to start watching live TV channels.",
+            message: "Your source doesn't have any live TV channels, or they're still loading.",
             actionTitle: nil,
             action: nil
         )

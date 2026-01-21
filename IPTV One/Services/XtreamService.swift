@@ -322,8 +322,13 @@ actor XtreamService {
             "\(baseURL)/player_api.php?username=\(username)&password=\(password)"
         }
         
-        func liveStreamURL(streamId: Int) -> String {
-            "\(baseURL)/live/\(username)/\(password)/\(streamId).m3u8"
+        func liveStreamURL(streamId: Int, format: String = "m3u8") -> String {
+            "\(baseURL)/live/\(username)/\(password)/\(streamId).\(format)"
+        }
+        
+        /// Returns the live stream URL - tries .ts format which is more universally supported
+        func liveStreamURLTS(streamId: Int) -> String {
+            "\(baseURL)/live/\(username)/\(password)/\(streamId).ts"
         }
         
         func vodStreamURL(streamId: Int, extension ext: String) -> String {
@@ -342,7 +347,8 @@ actor XtreamService {
         
         print("[XtreamService] Authenticating with: \(credentials.baseURL)")
         
-        let data = try await NetworkService.shared.fetchData(from: url, useCache: false)
+        // Use fast fetch for API calls
+        let data = try await NetworkService.shared.fetchDataFast(from: url)
         
         let decoder = JSONDecoder()
         do {
@@ -369,7 +375,7 @@ actor XtreamService {
         }
         
         print("[XtreamService] Fetching live categories")
-        let data = try await NetworkService.shared.fetchData(from: url, useCache: false)
+        let data = try await NetworkService.shared.fetchDataFast(from: url)
         return try JSONDecoder().decode([XtreamCategory].self, from: data)
     }
     
@@ -380,7 +386,7 @@ actor XtreamService {
         }
         
         print("[XtreamService] Fetching VOD categories")
-        let data = try await NetworkService.shared.fetchData(from: url, useCache: false)
+        let data = try await NetworkService.shared.fetchDataFast(from: url)
         return try JSONDecoder().decode([XtreamCategory].self, from: data)
     }
     
@@ -391,7 +397,7 @@ actor XtreamService {
         }
         
         print("[XtreamService] Fetching series categories")
-        let data = try await NetworkService.shared.fetchData(from: url, useCache: false)
+        let data = try await NetworkService.shared.fetchDataFast(from: url)
         return try JSONDecoder().decode([XtreamCategory].self, from: data)
     }
     
@@ -402,7 +408,8 @@ actor XtreamService {
         }
         
         print("[XtreamService] Fetching live streams")
-        let data = try await NetworkService.shared.fetchData(from: url, useCache: false)
+        // This can return a lot of data, use regular fetch
+        let data = try await NetworkService.shared.fetchData(from: url, useCache: false, verbose: false)
         return try JSONDecoder().decode([XtreamLiveStream].self, from: data)
     }
     
@@ -413,7 +420,8 @@ actor XtreamService {
         }
         
         print("[XtreamService] Fetching VOD streams")
-        let data = try await NetworkService.shared.fetchData(from: url, useCache: false)
+        // This can return a lot of data, use regular fetch
+        let data = try await NetworkService.shared.fetchData(from: url, useCache: false, verbose: false)
         return try JSONDecoder().decode([XtreamVodStream].self, from: data)
     }
     
@@ -424,7 +432,8 @@ actor XtreamService {
         }
         
         print("[XtreamService] Fetching series")
-        let data = try await NetworkService.shared.fetchData(from: url, useCache: false)
+        // This can return a lot of data, use regular fetch
+        let data = try await NetworkService.shared.fetchData(from: url, useCache: false, verbose: false)
         return try JSONDecoder().decode([XtreamSeries].self, from: data)
     }
     
@@ -435,7 +444,7 @@ actor XtreamService {
         }
         
         print("[XtreamService] Fetching series info for ID: \(seriesId)")
-        let data = try await NetworkService.shared.fetchData(from: url, useCache: false)
+        let data = try await NetworkService.shared.fetchDataFast(from: url)
         return try JSONDecoder().decode(XtreamSeriesInfo.self, from: data)
     }
 }

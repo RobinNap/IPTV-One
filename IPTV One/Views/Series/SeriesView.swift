@@ -12,13 +12,21 @@ struct SeriesView: View {
     @Bindable var sourceManager: SourceManager
     
     @Environment(\.modelContext) private var modelContext
+    @Query private var sources: [Source]
     @Query(sort: \Series.name) private var allSeries: [Series]
     
     @State private var searchText = ""
     @State private var selectedCategory: String?
     @State private var selectedSeries: Series?
     
+    /// Check if there's at least one configured source
+    private var hasActiveSource: Bool {
+        sources.contains { $0.isActive }
+    }
+    
     private var series: [Series] {
+        guard hasActiveSource else { return [] }
+        
         var filtered = allSeries
         
         if !searchText.isEmpty {
@@ -35,19 +43,28 @@ struct SeriesView: View {
     }
     
     private var categories: [String] {
-        Array(Set(allSeries.map { $0.categoryName })).sorted()
+        guard hasActiveSource else { return [] }
+        return Array(Set(allSeries.map { $0.categoryName })).sorted()
     }
     
     var body: some View {
         ZStack {
             Color.darkBackground.ignoresSafeArea()
             
-            // Show full loading screen only before any series are loaded
-            if sourceManager.isLoadingSeries && allSeries.isEmpty {
+            // No source configured
+            if sources.isEmpty {
+                noSourceState
+            }
+            // Show loading screen while loading series
+            else if sourceManager.isLoadingSeries && series.isEmpty {
                 LoadingView(message: sourceManager.loadingMessage, progress: sourceManager.loadingProgress)
-            } else if allSeries.isEmpty {
+            }
+            // Source exists but no series
+            else if series.isEmpty {
                 emptyState
-            } else {
+            }
+            // Show series
+            else {
                 seriesGrid
             }
         }
@@ -60,11 +77,21 @@ struct SeriesView: View {
         }
     }
     
+    private var noSourceState: some View {
+        EmptyStateView(
+            icon: "plus.circle",
+            title: "No Source Configured",
+            message: "Add an IPTV source in Settings to browse TV series.",
+            actionTitle: nil,
+            action: nil
+        )
+    }
+    
     private var emptyState: some View {
         EmptyStateView(
             icon: "tv",
             title: "No Series",
-            message: "Add a source in Settings to browse TV series.",
+            message: "Your source doesn't have any TV series, or they're still loading.",
             actionTitle: nil,
             action: nil
         )

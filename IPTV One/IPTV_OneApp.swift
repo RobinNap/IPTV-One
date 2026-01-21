@@ -10,6 +10,7 @@ import SwiftData
 
 @main
 struct IPTV_OneApp: App {
+    
     var sharedModelContainer: ModelContainer = {
         let schema = Schema([
             Source.self,
@@ -51,11 +52,26 @@ struct IPTV_OneApp: App {
         WindowGroup {
             MainTabView()
                 .preferredColorScheme(.dark)
+                .task {
+                    // Start the proxy server on app launch
+                    await startProxyServer()
+                }
         }
         .modelContainer(sharedModelContainer)
         #if os(macOS)
         .windowStyle(.hiddenTitleBar)
         .defaultSize(width: 1200, height: 800)
         #endif
+    }
+    
+    /// Start the local proxy server for IPTV streaming
+    private func startProxyServer() async {
+        do {
+            try await StreamProxyServer.shared.start()
+            print("[App] ✓ Stream proxy server started on port \(StreamProxyServer.shared.port)")
+        } catch {
+            print("[App] ✗ Failed to start proxy server: \(error)")
+            // The app can still function - proxy will be started when needed
+        }
     }
 }

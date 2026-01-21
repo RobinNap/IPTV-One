@@ -63,7 +63,8 @@ struct SeriesDetailView: View {
                 VideoPlayerView(
                     title: episode.name,
                     streamURL: episode.streamURL,
-                    posterURL: episode.stillURL ?? series.posterURL
+                    posterURL: episode.stillURL ?? series.posterURL,
+                    isLiveStream: false
                 )
             }
         }

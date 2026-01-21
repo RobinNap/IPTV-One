@@ -27,6 +27,10 @@ class SourceManager {
     
     private var modelContext: ModelContext?
     
+    // Batch size for inserts to prevent database lock contention
+    // Larger batches = fewer saves = less "database busy" warnings
+    private let batchSize = 500
+    
     func setModelContext(_ context: ModelContext) {
         self.modelContext = context
     }
@@ -194,23 +198,42 @@ class SourceManager {
             
             loadingProgress = 0.3
             
+            // Process channels in batches to prevent database lock contention
             var channelCount = 0
+            var batch: [Channel] = []
+            
             for stream in liveStreams {
                 guard let streamId = stream.streamId?.value else { continue }
                 
                 let categoryName = stream.categoryId.flatMap { liveCategoryMap[$0] } ?? "Uncategorized"
                 
+                // Use .ts format which is more universally supported by IPTV providers
                 let channel = Channel(
                     name: stream.name ?? "Unknown",
-                    streamURL: credentials.liveStreamURL(streamId: streamId),
+                    streamURL: credentials.liveStreamURL(streamId: streamId, format: "ts"),
                     logoURL: stream.streamIcon,
                     categoryName: categoryName,
                     epgID: stream.epgChannelId,
                     tvgName: stream.name
                 )
                 channel.source = source
-                modelContext.insert(channel)
+                batch.append(channel)
                 channelCount += 1
+                
+                // Batch insert to reduce database contention
+                if batch.count >= batchSize {
+                    for item in batch {
+                        modelContext.insert(item)
+                    }
+                    batch.removeAll()
+                    // Yield to prevent UI blocking
+                    await Task.yield()
+                }
+            }
+            
+            // Insert remaining items
+            for item in batch {
+                modelContext.insert(item)
             }
             
             // Save channels immediately - user can now browse Live TV!
@@ -229,7 +252,10 @@ class SourceManager {
             
             loadingProgress = 0.6
             
+            // Process movies in batches
             var movieCount = 0
+            var movieBatch: [Movie] = []
+            
             for stream in vodStreams {
                 guard let streamId = stream.streamId?.value else { continue }
                 
@@ -244,8 +270,20 @@ class SourceManager {
                     rating: stream.rating
                 )
                 movie.source = source
-                modelContext.insert(movie)
+                movieBatch.append(movie)
                 movieCount += 1
+                
+                if movieBatch.count >= batchSize {
+                    for item in movieBatch {
+                        modelContext.insert(item)
+                    }
+                    movieBatch.removeAll()
+                    await Task.yield()
+                }
+            }
+            
+            for item in movieBatch {
+                modelContext.insert(item)
             }
             
             // Save movies - user can now browse Movies!
@@ -263,7 +301,10 @@ class SourceManager {
             
             loadingProgress = 0.9
             
+            // Process series in batches
             var seriesCount = 0
+            var seriesBatch: [Series] = []
+            
             for seriesItem in seriesList {
                 guard let seriesId = seriesItem.seriesId?.value else { continue }
                 
@@ -281,8 +322,20 @@ class SourceManager {
                     xtreamSeriesId: seriesId
                 )
                 series.source = source
-                modelContext.insert(series)
+                seriesBatch.append(series)
                 seriesCount += 1
+                
+                if seriesBatch.count >= batchSize {
+                    for item in seriesBatch {
+                        modelContext.insert(item)
+                    }
+                    seriesBatch.removeAll()
+                    await Task.yield()
+                }
+            }
+            
+            for item in seriesBatch {
+                modelContext.insert(item)
             }
             
             // Save series

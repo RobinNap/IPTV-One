@@ -12,14 +12,23 @@ struct MoviesView: View {
     @Bindable var sourceManager: SourceManager
     
     @Environment(\.modelContext) private var modelContext
+    @Query private var sources: [Source]
     @Query(sort: \Movie.name) private var allMovies: [Movie]
     
     @State private var searchText = ""
     @State private var selectedCategory: String?
     @State private var selectedMovie: Movie?
-    @State private var showingPlayer = false
+    @State private var movieToPlay: Movie?
+    @State private var pendingPlayMovie: Movie?
+    
+    /// Check if there's at least one configured source
+    private var hasActiveSource: Bool {
+        sources.contains { $0.isActive }
+    }
     
     private var movies: [Movie] {
+        guard hasActiveSource else { return [] }
+        
         var filtered = allMovies
         
         if !searchText.isEmpty {
@@ -36,11 +45,13 @@ struct MoviesView: View {
     }
     
     private var categories: [String] {
-        Array(Set(allMovies.map { $0.categoryName })).sorted()
+        guard hasActiveSource else { return [] }
+        return Array(Set(allMovies.map { $0.categoryName })).sorted()
     }
     
     private var continueWatching: [Movie] {
-        allMovies.filter { $0.watchProgress > 0 && $0.watchProgress < 0.95 }
+        guard hasActiveSource else { return [] }
+        return allMovies.filter { $0.watchProgress > 0 && $0.watchProgress < 0.95 }
             .sorted { ($0.lastWatched ?? .distantPast) > ($1.lastWatched ?? .distantPast) }
     }
     
@@ -48,12 +59,20 @@ struct MoviesView: View {
         ZStack {
             Color.darkBackground.ignoresSafeArea()
             
-            // Show full loading screen only before any movies are loaded
-            if sourceManager.isLoadingMovies && allMovies.isEmpty {
+            // No source configured
+            if sources.isEmpty {
+                noSourceState
+            }
+            // Show loading screen while loading movies
+            else if sourceManager.isLoadingMovies && movies.isEmpty {
                 LoadingView(message: sourceManager.loadingMessage, progress: sourceManager.loadingProgress)
-            } else if allMovies.isEmpty {
+            }
+            // Source exists but no movies
+            else if movies.isEmpty {
                 emptyState
-            } else {
+            }
+            // Show movies
+            else {
                 movieGrid
             }
         }
@@ -61,29 +80,49 @@ struct MoviesView: View {
         #if os(iOS)
         .navigationBarTitleDisplayMode(.large)
         #endif
-        .sheet(item: $selectedMovie) { movie in
+        .sheet(item: $selectedMovie, onDismiss: {
+            // After sheet dismisses, show player if we have a movie queued
+            if let movie = pendingPlayMovie {
+                pendingPlayMovie = nil
+                // Small delay to allow sheet dismissal animation to complete
+                DispatchQueue.main.asyncAfter(deadline: .now() + 0.3) {
+                    movieToPlay = movie
+                }
+            }
+        }) { movie in
             MovieDetailView(movie: movie) {
-                showingPlayer = true
+                // Queue movie to play and dismiss the sheet
+                pendingPlayMovie = movie
+                selectedMovie = nil  // This dismisses the sheet
             }
             .presentationDetents([.medium, .large])
             .presentationDragIndicator(.visible)
         }
-        .fullScreenCover(isPresented: $showingPlayer) {
-            if let movie = selectedMovie {
-                VideoPlayerView(
-                    title: movie.name,
-                    streamURL: movie.streamURL,
-                    posterURL: movie.posterURL
-                )
-            }
+        .fullScreenCover(item: $movieToPlay) { movie in
+            VideoPlayerView(
+                title: movie.name,
+                streamURL: movie.streamURL,
+                posterURL: movie.posterURL,
+                isLiveStream: false
+            )
         }
+    }
+    
+    private var noSourceState: some View {
+        EmptyStateView(
+            icon: "plus.circle",
+            title: "No Source Configured",
+            message: "Add an IPTV source in Settings to browse movies.",
+            actionTitle: nil,
+            action: nil
+        )
     }
     
     private var emptyState: some View {
         EmptyStateView(
             icon: "film",
             title: "No Movies",
-            message: "Add a source in Settings to browse movies.",
+            message: "Your source doesn't have any movies, or they're still loading.",
             actionTitle: nil,
             action: nil
         )
